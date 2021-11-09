@@ -36,37 +36,8 @@ class Client:
             password=credentials.password
         )
 
-    def get_entity(self, entity):
-        items = []
-        entity_lookup = {
-            'catalog'       : 'IAAS_CATALOG',
-            'company'       : 'COMPANY',
-            'edge'          : 'IAAS_EDGE',
-            'location'      : 'IAAS_LOCATION',
-            'media'         : 'IAAS_MEDIA',
-            'network'       : 'IAAS_INTERNAL_NETWORK',
-            'o365_job'      : 'O365_JOB',
-            'o365_location' : 'O365_LOCATION',
-            'o365_org'      : 'O365_ORGANIZATION',
-            'o365_restore'  : 'O365_RESTORE_SESSION',
-            'org'           : 'IAAS_ORGANIZATION',
-            'template'      : 'IAAS_VAPP_TEMPLATE',
-            'vdc'           : 'IAAS_VDC',
-            'vapp'          : 'IAAS_VAPP',
-            'vapp_network'  : 'IAAS_VAPP_NETWORK',
-            'vcc_location'  : 'VCC_BACKUP_LOCATION',
-            'vcc_tenant'    : 'VCC_BACKUP_TENANT',
-            'vpg'           : 'IAAS_VPG',
-            'vm'            : 'IAAS_VM'
-        }
-
-        inventory = self.api.get(f"/users/{self.username}/inventory")
-
-        api_entity = entity_lookup[entity]
-        for company in inventory['inventory']:
-            for item in company['entities'][api_entity]:
-                items.append(item)
-        return items
+    def get_inventory(self):
+        return self.api.get(f"/users/{self.username}/inventory")
 
 class Task:
     def __init__(self, client, task_data):
@@ -98,25 +69,83 @@ class Task:
                 print(f"{self.operation} - {self.status}")
             time.sleep(5)
 
-def list_object(api_client, object):
-    if object == 'company':
-        for company in api_client.get_entity(object):
-            print(f"{company['name']}, {company['uuid']}")
-    if object == 'location':
-        for location in api_client.get_entity(object):
-            print(f"{location['name']}")
-    if object == 'org':
-        for org in api_client.get_entity(object):
-            print(f"{org['name']}, {org['uuid']}")
-    if object == 'vdc':
-        for vdc in api_client.get_entity(object):
-            print(f"{vdc['name']}, {vdc['uuid']}")
-    if object == 'vapp':
-        for vapp in api_client.get_entity(object):
-            print(f"{vapp['name']}, {vapp['uuid']}")
-    if object == 'vm':
-        for vm in api_client.get_entity(object):
-            print(f"{vm['name']}, {vm['uuid']}")        
+def get_entity(inventory, entity):
+    items = []
+    entity_lookup = {
+        'catalog'       : 'IAAS_CATALOG',
+        'company'       : 'COMPANY',
+        'edge'          : 'IAAS_EDGE',
+        'location'      : 'IAAS_LOCATION',
+        'media'         : 'IAAS_MEDIA',
+        'network'       : 'IAAS_INTERNAL_NETWORK',
+        'o365_job'      : 'O365_JOB',
+        'o365_location' : 'O365_LOCATION',
+        'o365_org'      : 'O365_ORGANIZATION',
+        'o365_restore'  : 'O365_RESTORE_SESSION',
+        'org'           : 'IAAS_ORGANIZATION',
+        'template'      : 'IAAS_VAPP_TEMPLATE',
+        'vdc'           : 'IAAS_VDC',
+        'vapp'          : 'IAAS_VAPP',
+        'vapp_network'  : 'IAAS_VAPP_NETWORK',
+        'vcc_location'  : 'VCC_BACKUP_LOCATION',
+        'vcc_tenant'    : 'VCC_BACKUP_TENANT',
+        'vpg'           : 'IAAS_VPG',
+        'vm'            : 'IAAS_VM'
+    }
+
+    api_entity = entity_lookup[entity]
+    for company in inventory['inventory']:
+        for item in company['entities'][api_entity]:
+            items.append(item)
+    return items
+
+def list_company(entity):
+    print('Company_Name, Company_UUID')
+    for company in entity:
+        print(f"{company['name']}, {company['uuid']}")
+
+def list_location(entity):
+    print('Location')
+    for location in entity:
+        print(f"{location['name']}")
+
+def list_o365_org(entity):
+    print('O365_Organization_Name, O365_Organization_UUID')
+    for o365_org in entity:
+        print(f"{o365_org['name']}, {o365_org['uuid']}")
+
+def list_org(entity):
+    print('Organization_Name, Organization_UUID')
+    for org in entity:
+        print(f"{org['name']}, {org['uuid']}")
+
+def list_vdc(entity):
+    print('VDC_Name, VDC_UUID')
+    for vdc in entity:
+        print(f"{vdc['name']}, {vdc['uuid']}")
+
+def list_vapp(entity):
+    print('vApp_Name, vApp_UUID')
+    for vapp in entity:
+        print(f"{vapp['name']}, {vapp['uuid']}")
+
+def list_vm(entity):
+    print('VM_Name, VM_UUID')
+    for vm in entity:
+        print(f"{vm['name']}, {vm['uuid']}")        
+
+def dispatch_list(inventory, object):
+    entity = get_entity(inventory, object)
+    dispatch = {
+        'company': list_company,
+        'location': list_location,
+        'o365_org': list_o365_org,
+        'org': list_org,
+        'vdc': list_vdc,
+        'vapp': list_vapp,
+        'vm': list_vm
+    }
+    dispatch[object](entity)
 
 def get_args():
     """ Setup the argument parser and parse the arguments.
@@ -145,7 +174,7 @@ def get_args():
     )
     list_parser = list_parser.add_argument(
         'object',
-        choices=['company', 'location', 'org', 'vdc', 'vapp', 'vm'],
+        choices=['company', 'location', 'o365_org', 'org', 'vdc', 'vapp', 'vm'],
         default=None,
         help='Type of object to list'
     )
@@ -153,11 +182,12 @@ def get_args():
 
 def main():
     args = get_args()
-    api_credentials = Credentials(args.credentials_file)
-    api_client = Client(api_credentials)
+    credentials = Credentials(args.credentials_file)
+    client = Client(credentials)
 
     if args.command == 'list':
-        list_object(api_client, args.object)
+        inventory = client.get_inventory()
+        dispatch_list(inventory, args.object)
 
 
 if __name__ == '__main__':
