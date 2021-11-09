@@ -150,9 +150,9 @@ def dispatch_list(inventory, object):
 def get_args():
     """ Setup the argument parser and parse the arguments.
 
-        ilandinfo list {company, location, org, vdc, vapp, vm}
+        ilandinfo list object
         
-        -c, --credfential-file  default=creds.json
+        -c, --credential-file  default=creds.json
     """
     parser = argparse.ArgumentParser(
         description='Collect information about your iland Cloud environment using the iland cloud API'
@@ -184,6 +184,9 @@ def main():
     args = get_args()
     credentials = Credentials(args.credentials_file)
     client = Client(credentials)
+
+    # Set iland logger level to WARNING to reduce noise
+    iland.log.LOG.setLevel(logging.WARNING)
 
     if args.command == 'list':
         inventory = client.get_inventory()
