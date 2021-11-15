@@ -82,17 +82,17 @@ class Inventory:
             'location'      : 'IAAS_LOCATION',
             'media'         : 'IAAS_MEDIA',
             'network'       : 'IAAS_INTERNAL_NETWORK',
-            'o365_job'      : 'O365_JOB',
-            'o365_location' : 'O365_LOCATION',
-            'o365_org'      : 'O365_ORGANIZATION',
-            'o365_restore'  : 'O365_RESTORE_SESSION',
+            'o365-job'      : 'O365_JOB',
+            'o365-location' : 'O365_LOCATION',
+            'o365-org'      : 'O365_ORGANIZATION',
+            'o365-restore'  : 'O365_RESTORE_SESSION',
             'org'           : 'IAAS_ORGANIZATION',
             'template'      : 'IAAS_VAPP_TEMPLATE',
             'vdc'           : 'IAAS_VDC',
             'vapp'          : 'IAAS_VAPP',
-            'vapp_network'  : 'IAAS_VAPP_NETWORK',
-            'vcc_location'  : 'VCC_BACKUP_LOCATION',
-            'vcc_tenant'    : 'VCC_BACKUP_TENANT',
+            'vapp-network'  : 'IAAS_VAPP_NETWORK',
+            'vcc-location'  : 'VCC_BACKUP_LOCATION',
+            'vcc-tenant'    : 'VCC_BACKUP_TENANT',
             'vpg'           : 'IAAS_VPG',
             'vm'            : 'IAAS_VM'
         }
@@ -135,11 +135,54 @@ def get_args():
     )
     inventory_parser.add_argument(
         'object',
-        choices=['backup', 'company', 'location', 'o365_org', 'org', 'vapp', 'vdc', 'vm'],
+        choices=[
+            'backup',
+            'company',
+            'location',
+            'o365-org',
+            'org',
+            'vapp',
+            'vdc',
+            'vm'
+        ],
         default=None,
         help='Type of object to list'
     )
+    report_parser = subparsers.add_parser(
+        'billing',
+        help='Display the billing report for the specified service'
+    )
+    report_parser.add_argument(
+        'service',
+        choices=[
+            'backup',
+            'org',
+            'org-by-vdc',
+            'org-historical',
+            'org-historical-vdc',
+            'vapp',
+            'vdc',
+            'vm',
+            'vm-summary'
+        ]
+    )
     return parser.parse_args()
+
+# Billing code points in iland API:
+# ?, '/orgs/{uuid}/generate-billing-report' csv only
+# ?, '/orgs/{uuid}/billing-reports' supports format param
+# ?, '/orgs/{uuid}/billing-currency-code'
+# 'vac', '/companies/{companyId}/vac-backup-tenants-billing'
+# ?, '/locations/{locationId}/{companyId}/vac-currency-code'
+# 'backup', '/companies/{companyId}/vcc-backup-tenants-billing'
+# 'org', '/orgs/{uuid}/billing'
+# 'org-by-vdc', '/orgs/{uuid}/billing-by-vdc'
+# 'org-historical', '/orgs/{uuid}/historical-billing'
+# 'org-historical-vdc', '/orgs/{uuid}/historical-billing-by-vdc'
+# 'vapp', '/vapps/{uuid}/billing'
+# 'vdc', '/vdcs/{uuid}/billing'
+# 'vm', '/vms/{uuid}/billing'
+# 'vm-summary', '/vms/{uuid}/billing-summary'
 
 def main():
     args = get_args()
