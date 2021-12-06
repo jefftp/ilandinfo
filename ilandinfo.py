@@ -26,103 +26,19 @@ class Credentials:
         self.username = credentials['username']
         self.password = credentials['password']
 
-class Client:
-    def __init__(self, credentials):
-        self.username = credentials.username
-        self.api = iland.Api(
-            client_id=credentials.client_id,
-            client_secret=credentials.client_secret,
-            username=credentials.username,
-            password=credentials.password
-        )
-
-    def get_inventory(self):
-        """Return the inventory object for the user specified in the credentials file."""
-        return Inventory(self.api.get(f"/users/{self.username}/inventory"))
-
-    def get_org_billing_summary(self, uuid):
-        """Returns previous month, current month, previous hour, and current hour billing
-
-        Example from iland console:
-        https://console.ilandcloud.com/api/v1/orgs/{uuid}/billing-summary
-        """
-        return Report(self.api.get(f"/orgs/{uuid}/billing-summary"))
-
-    def get_org_billing(self, uuid, date):
-        """Returns current billing information
-        
-        Example from iland console:
-        https://console.ilandcloud.com/api/v1/orgs/{uuid}/billing
-        """
-        parameters = f"year={date.tm_year}&month={date.tm_mon}"
-        return Report(self.api.get(f"/orgs/{uuid}/billing?{parameters}"))
-
-    def get_org_billing_by_vdc(self, uuid):
-        """Returns billing information by VDC
-        
-        No example use discovered in the iland console.
-        """
-        return Report(self.api.get(f"/orgs/{uuid}/billing-by-vdc"))
-
-    def get_org_billing_historical(self, uuid, start_struct, end_struct):
-        """Returns a series of historical monthly org costs
-
-        The console pulls the last 5 months to use in the montly bar graph on the billing tab:
-        https://console.ilandcloud.com/api/v1/orgs/{uuid}/historical-billing?start=1624027630654&end=1637250430654
-        """
-        start = int(time.mktime(start_struct)) * 1000
-        end = int(time.mktime(end_struct)) * 1000
-        parameters = f"start={start}&end={end}"
-        return Report(self.api.get(f"/orgs/{uuid}/historical-billing?{parameters}"))
-
-
-    def get_org_billing_historical_vdc(self, uuid, start, end):
-        """Returns the historical billing data by VDC
-        
-        The console uses historical-billing-by-vdc to build the historical billing bar graphs.
-        https://console.ilandcloud.com/api/v1/orgs/{uuid}/historical-billing-by-vdc?startMonth=7&startYear=2021&endMonth=11&endYear=2021
-        """
-        parameters = f"startYear={start.tm_year}&startMonth={start.tm_mon}&endYear={end.tm_year}&endMonth={end.tm_mon}"
-        return Report(self.api.get(f"/orgs/{uuid}/historical-billing-by-vdc?{parameters}"))
-
-    # vdcs-cost-over-invoice-period ? year, month
-    # Returns a time series (1 hour increments) of VDCs sum costs for the VDC Cost Accrual Breakdown graph
-    # https://console.ilandcloud.com/api/v1/orgs/{uuid}/vdcs-cost-over-invoice-period?year=2021&month=11
-
-
-class Task:
-    def __init__(self, client, task_data):
-        self.client = client
-        self.uuid = task_data['uuid']
-        self.status = task_data['status']
-        self.active = task_data['active']
-        self.message = task_data['message']
-        self.operation = task_data['operation']
-
-    def refresh(self):
-        task = self.client.api.get(f"/tasks/{self.uuid}")
-        self.status = task['status']
-        self.active = task['active']
-        self.message = task['message']
-        self.operation = task['operation']
-        return
-
-    def watch(self):
-        while True:
-            self.refresh()
-            if self.active == False:
-                if self.status == 'success':
-                    print(f"{self.operation} - {self.status}")
-                else:
-                    print(f"{self.operation} - {self.status} ({self.message})")
-                return
-            else:
-                print(f"{self.operation} - {self.status}")
-            time.sleep(5)
-
 class Inventory:
     def __init__(self, data):
-        self.data = data
+        self.company_id = data['company_id']
+        self.company_name = data['company_name']
+        self.entities = data['entities']
+
+    def __str__(self):
+        data = {
+            'company_id'  : self.company_id,
+            'company_name': self.company_name,
+            'entities'    : self.entities
+        }
+        return json.dumps(data, sort_keys=True, indent=2)
 
     def get_entity(self, object):
         items = []
@@ -147,10 +63,10 @@ class Inventory:
             'vpg'           : 'IAAS_VPG',
             'vm'            : 'IAAS_VM'
         }
+
         api_entity = entity_lookup[object]
-        for company in self.data['inventory']:
-            for item in company['entities'][api_entity]:
-                items.append(item)
+        for item in self.entities[api_entity]:
+            items.append(item)
         return items
 
     def csv_list_object(self, object):
@@ -172,7 +88,114 @@ class Report:
     def __repr__(self):
         return self.data
 
-def get_args():
+class Client:
+    def __init__(self, credentials):
+        self.username = credentials.username
+        self.api = iland.Api(
+            client_id=credentials.client_id,
+            client_secret=credentials.client_secret,
+            username=credentials.username,
+            password=credentials.password
+        )
+
+    def get_inventory(self, company) -> Inventory:
+        """Return the inventory object for the user specified in the credentials file."""
+        inventory = self.api.get(f"/users/{self.username}/inventory")
+        return Inventory(inventory['inventory'][0])
+
+    def get_org_billing_summary(self, uuid) -> Report:
+        """Returns previous month, current month, previous hour, and current hour billing
+
+        Example from iland console:
+        https://console.ilandcloud.com/api/v1/orgs/{uuid}/billing-summary
+        """
+        return Report(self.api.get(f"/orgs/{uuid}/billing-summary"))
+
+    def get_org_billing(self, uuid, date) -> Report:
+        """Returns current billing information
+        
+        Example from iland console:
+        https://console.ilandcloud.com/api/v1/orgs/{uuid}/billing
+        """
+        parameters = f"year={date.tm_year}&month={date.tm_mon}"
+        return Report(self.api.get(f"/orgs/{uuid}/billing?{parameters}"))
+
+    def get_org_billing_by_vdc(self, uuid) -> Report:
+        """Returns billing information by VDC
+        
+        No example use discovered in the iland console.
+        """
+        return Report(self.api.get(f"/orgs/{uuid}/billing-by-vdc"))
+
+    def get_org_billing_historical(self, uuid, start_struct, end_struct) -> Report:
+        """Returns a series of historical monthly org costs
+
+        The console pulls the last 5 months to use in the montly bar graph on the billing tab:
+        https://console.ilandcloud.com/api/v1/orgs/{uuid}/historical-billing?start=1624027630654&end=1637250430654
+        """
+        start = int(time.mktime(start_struct)) * 1000
+        end = int(time.mktime(end_struct)) * 1000
+        parameters = f"start={start}&end={end}"
+        return Report(self.api.get(f"/orgs/{uuid}/historical-billing?{parameters}"))
+
+
+    def get_org_billing_historical_vdc(self, uuid, start, end) -> Report:
+        """Returns the historical billing data by VDC
+        
+        The console uses historical-billing-by-vdc to build the historical billing bar graphs.
+        https://console.ilandcloud.com/api/v1/orgs/{uuid}/historical-billing-by-vdc?startMonth=7&startYear=2021&endMonth=11&endYear=2021
+        """
+        parameters = f"startYear={start.tm_year}&startMonth={start.tm_mon}&endYear={end.tm_year}&endMonth={end.tm_mon}"
+        return Report(self.api.get(f"/orgs/{uuid}/historical-billing-by-vdc?{parameters}"))
+
+    def get_o365_billing(self, company, location) -> Report:
+        """Returns the O365 billing for a location
+        
+        Get company from: Inventory['inventory'][0]['company_id']
+        Get o365_orgs from: Inventory['inventory'][0]['entities']['O365_ORGANIZATION']
+        Get locations from: o365_orgs[0]['uuid'].split(':')[0]
+
+        Console example:
+        https://console.ilandcloud.com/api/v1/companies/{company}/location/lon02.ilandcloud.com/o365-billing?startYear=2021&startMonth=9&endYear=2021&endMonth=11
+        """
+        return Report(self.api.get(f"/companies/{company}/location/{location}/o365-billing"))
+
+    # vdcs-cost-over-invoice-period ? year, month
+    # Returns a time series (1 hour increments) of VDCs sum costs for the VDC Cost Accrual Breakdown graph
+    # https://console.ilandcloud.com/api/v1/orgs/{uuid}/vdcs-cost-over-invoice-period?year=2021&month=11
+
+
+class Task:
+    def __init__(self, client, task_data):
+        self.client = client
+        self.uuid = task_data['uuid']
+        self.status = task_data['status']
+        self.active = task_data['active']
+        self.message = task_data['message']
+        self.operation = task_data['operation']
+
+    def refresh(self) -> None:
+        task = self.client.api.get(f"/tasks/{self.uuid}")
+        self.status = task['status']
+        self.active = task['active']
+        self.message = task['message']
+        self.operation = task['operation']
+
+    def watch(self) -> None:
+        while True:
+            self.refresh()
+            if self.active == False:
+                if self.status == 'success':
+                    print(f"{self.operation} - {self.status}")
+                else:
+                    print(f"{self.operation} - {self.status} ({self.message})")
+                return
+            else:
+                print(f"{self.operation} - {self.status}")
+            time.sleep(5)
+
+
+def get_args() -> argparse.Namespace:
     """ Setup the argument parser and parse the arguments.
 
         ilandinfo inventory object
@@ -263,8 +286,9 @@ def get_args():
 # 'vdc', '/vdcs/{uuid}/billing'
 # 'vm', '/vms/{uuid}/billing'
 # 'vm-summary', '/vms/{uuid}/billing-summary'
+# 'o356', '/companies/{company}/location/{location}/o365-billing'
 
-def parse_time(time_string):
+def parse_time(time_string) -> time.time.struct_time:
     """Take a string with the format YYYY-MM and return a time.struct_time"""
     try:
         time_struct = time.strptime(time_string, '%Y-%m')
@@ -273,11 +297,11 @@ def parse_time(time_string):
 
     return time_struct
 
-def requires_start_end(args):
+def requires_start_end(args) -> None:
     if not args.start or not args.end:
         sys.exit(f'Missing parameters. {args.command} {args.service} requires --start and --end options.')
 
-def main():
+def main() -> None:
     args = get_args()
     credentials = Credentials(args.credentials_file)
     client = Client(credentials)
@@ -315,7 +339,8 @@ def main():
             end = parse_time(args.end)
             report = client.get_org_billing_historical_vdc(args.uuid, start, end)
             print(report)
-
+        elif args.service== 'o365':
+            raise NotImplementedError
 
 if __name__ == '__main__':
     main()
