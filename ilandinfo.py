@@ -16,16 +16,6 @@ import json
 import time
 import sys
 
-class Credentials:
-    def __init__(self, credentials_file):
-        with open(credentials_file, 'r') as file:
-            credentials = json.load(file)
-
-        self.client_id = credentials['client_id']
-        self.client_secret = credentials['client_secret']
-        self.username = credentials['username']
-        self.password = credentials['password']
-
 class Inventory:
     def __init__(self, data):
         self.company_id = data['company_id']
@@ -90,15 +80,10 @@ class Report:
 
 class Client:
     def __init__(self, credentials):
-        self.username = credentials.username
-        self.api = iland.Api(
-            client_id=credentials.client_id,
-            client_secret=credentials.client_secret,
-            username=credentials.username,
-            password=credentials.password
-        )
+        self.username = credentials['username']
+        self.api = iland.Api(**credentials)
 
-    def get_inventory(self, company) -> Inventory:
+    def get_inventory(self) -> Inventory:
         """Return the inventory object for the user specified in the credentials file."""
         inventory = self.api.get(f"/users/{self.username}/inventory")
         return Inventory(inventory['inventory'][0])
@@ -277,6 +262,11 @@ def get_args() -> argparse.Namespace:
 
     return parser.parse_args()
 
+def get_credentials(credentials_file) -> dict:
+    with open(credentials_file, 'r') as file:
+        credentials = json.load(file)
+    return credentials
+
 # Billing code points in iland API:
 # ?, '/orgs/{uuid}/generate-billing-report' csv only
 # ?, '/orgs/{uuid}/billing-reports' supports format param
@@ -288,7 +278,7 @@ def get_args() -> argparse.Namespace:
 # 'vm-summary', '/vms/{uuid}/billing-summary'
 # 'o356', '/companies/{company}/location/{location}/o365-billing'
 
-def parse_time(time_string) -> time.time.struct_time:
+def parse_time(time_string) -> time.struct_time:
     """Take a string with the format YYYY-MM and return a time.struct_time"""
     try:
         time_struct = time.strptime(time_string, '%Y-%m')
@@ -303,7 +293,7 @@ def requires_start_end(args) -> None:
 
 def main() -> None:
     args = get_args()
-    credentials = Credentials(args.credentials_file)
+    credentials = get_credentials(args.credentials_file)
     client = Client(credentials)
 
     # Set iland logger level to WARNING to reduce noise
