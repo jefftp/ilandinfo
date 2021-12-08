@@ -31,6 +31,7 @@ class Inventory:
         return json.dumps(data, sort_keys=True, indent=2)
 
     def get_entity(self, object):
+        """Convert the object type used in the CLI to the API entity label."""
         items = []
         entity_lookup = {
             'catalog'       : 'IAAS_CATALOG',
@@ -60,6 +61,7 @@ class Inventory:
         return items
 
     def csv_list_object(self, object):
+        """Print out a CSV style inventory list of the object type specified."""
         entity_list = self.get_entity(object)
         print('Name, UUID')
         for item in entity_list:
@@ -147,38 +149,7 @@ class Client:
 
     # vdcs-cost-over-invoice-period ? year, month
     # Returns a time series (1 hour increments) of VDCs sum costs for the VDC Cost Accrual Breakdown graph
-    # https://console.ilandcloud.com/api/v1/orgs/{uuid}/vdcs-cost-over-invoice-period?year=2021&month=11
-
-
-class Task:
-    def __init__(self, client, task_data):
-        self.client = client
-        self.uuid = task_data['uuid']
-        self.status = task_data['status']
-        self.active = task_data['active']
-        self.message = task_data['message']
-        self.operation = task_data['operation']
-
-    def refresh(self) -> None:
-        task = self.client.api.get(f"/tasks/{self.uuid}")
-        self.status = task['status']
-        self.active = task['active']
-        self.message = task['message']
-        self.operation = task['operation']
-
-    def watch(self) -> None:
-        while True:
-            self.refresh()
-            if self.active == False:
-                if self.status == 'success':
-                    print(f"{self.operation} - {self.status}")
-                else:
-                    print(f"{self.operation} - {self.status} ({self.message})")
-                return
-            else:
-                print(f"{self.operation} - {self.status}")
-            time.sleep(5)
-
+    # https://console.ilandcloud.com/api/v1/orgs/{uuid}/vdcs-cost-over-invoice-period?year={YYYY}&month={MM}
 
 def get_args() -> argparse.Namespace:
     """ Setup the argument parser and parse the arguments.
@@ -263,20 +234,10 @@ def get_args() -> argparse.Namespace:
     return parser.parse_args()
 
 def get_credentials(credentials_file) -> dict:
+    """Open the JSON format credentials file and import the credentials."""
     with open(credentials_file, 'r') as file:
         credentials = json.load(file)
     return credentials
-
-# Billing code points in iland API:
-# ?, '/orgs/{uuid}/generate-billing-report' csv only
-# ?, '/orgs/{uuid}/billing-reports' supports format param
-# 'vac', '/companies/{companyId}/vac-backup-tenants-billing'
-# 'backup', '/companies/{companyId}/vcc-backup-tenants-billing'
-# 'vapp', '/vapps/{uuid}/billing'
-# 'vdc', '/vdcs/{uuid}/billing'
-# 'vm', '/vms/{uuid}/billing'
-# 'vm-summary', '/vms/{uuid}/billing-summary'
-# 'o356', '/companies/{company}/location/{location}/o365-billing'
 
 def parse_time(time_string) -> time.struct_time:
     """Take a string with the format YYYY-MM and return a time.struct_time"""
@@ -288,6 +249,7 @@ def parse_time(time_string) -> time.struct_time:
     return time_struct
 
 def requires_start_end(args) -> None:
+    """Send an error if start and end dates are not provided on the command line."""
     if not args.start or not args.end:
         sys.exit(f'Missing parameters. {args.command} {args.service} requires --start and --end options.')
 
