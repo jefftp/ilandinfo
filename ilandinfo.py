@@ -7,7 +7,7 @@
 # is located in the file LICENSE.
 #
 
-__version__ = '1.0.0'
+__version__ = '0.9.0'
 
 import iland
 import argparse
@@ -256,14 +256,14 @@ def get_credentials(credentials_file: str) -> dict:
 def parse_date(date_string: str) -> datetime.date:
     """Take a string with the format YYYY-MM-DD and return a datetime.date"""
     try:
-        time_struct = datetime.date.fromisoformat(date_string)
+        date = datetime.date.fromisoformat(date_string)
     except ValueError:
         sys.exit('Incorrect date format. Correct format is YYYY-MM-DD.\n  \
             YYYY is the four-digit year.\n  \
             MM is the two-digit month.\n  \
             DD is the two-digit day.')
 
-    return time_struct
+    return date
 
 def check_required_arguments(args: argparse.Namespace, *arguments) -> None:
     """Send an error if required optional arguments are not provided."""
@@ -326,3 +326,11 @@ def main() -> None:
 
 if __name__ == '__main__':
     main()
+
+# TODO for version 1.0.0
+# - Add billing for vcc backup
+# - Create a customized help to replace the default argparse output.
+# TODO for version 2.0.0
+# - Add an --output-format option.
+# - Output billing in other formats: (CSV, Text)
+# - Output inventory in other formats: (Text, JSON)
