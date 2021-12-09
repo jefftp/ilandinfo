@@ -268,7 +268,6 @@ def parse_date(date_string: str) -> datetime.date:
 def check_required_arguments(args: argparse.Namespace, *arguments) -> None:
     """Send an error if required optional arguments are not provided."""
     missing_arguments = []
-    print(vars(args))
     for argument in arguments:
         if not vars(args)[argument]:
             missing_arguments.append(f"--{argument}")
