@@ -15,9 +15,12 @@ import logging
 import json
 import time
 import sys
+import datetime
+
+from dateutil.relativedelta import relativedelta
 
 class Inventory:
-    def __init__(self, data):
+    def __init__(self, data: dict):
         self.company_id = data['company_id']
         self.company_name = data['company_name']
         self.entities = data['entities']
@@ -30,7 +33,7 @@ class Inventory:
         }
         return json.dumps(data, sort_keys=True, indent=2)
 
-    def get_entity(self, object):
+    def get_entity(self, object: str):
         """Convert the object type used in the CLI to the API entity label."""
         items = []
         entity_lookup = {
@@ -60,7 +63,7 @@ class Inventory:
             items.append(item)
         return items
 
-    def csv_list_object(self, object):
+    def csv_list_object(self, object: str):
         """Print out a CSV style inventory list of the object type specified."""
         entity_list = self.get_entity(object)
         print('Name, UUID')
@@ -68,7 +71,7 @@ class Inventory:
             print(f"{item['name']}, {item['uuid']}")
 
 class Report:
-    def __init__(self, data):
+    def __init__(self, data: dict):
         if 'data' in data:
             self.data = data['data']
         else:
@@ -81,7 +84,7 @@ class Report:
         return self.data
 
 class Client:
-    def __init__(self, credentials):
+    def __init__(self, credentials: dict):
         self.username = credentials['username']
         self.api = iland.Api(**credentials)
 
@@ -90,7 +93,7 @@ class Client:
         inventory = self.api.get(f"/users/{self.username}/inventory")
         return Inventory(inventory['inventory'][0])
 
-    def get_org_billing_summary(self, uuid) -> Report:
+    def get_org_billing_summary(self, uuid: str) -> Report:
         """Returns previous month, current month, previous hour, and current hour billing
 
         Example from iland console:
@@ -98,54 +101,54 @@ class Client:
         """
         return Report(self.api.get(f"/orgs/{uuid}/billing-summary"))
 
-    def get_org_billing(self, uuid, date) -> Report:
+    def get_org_billing(self, uuid: str, date: datetime.date) -> Report:
         """Returns current billing information
         
         Example from iland console:
         https://console.ilandcloud.com/api/v1/orgs/{uuid}/billing
         """
-        parameters = f"year={date.tm_year}&month={date.tm_mon}"
+        parameters = f"year={date.year}&month={date.month}"
         return Report(self.api.get(f"/orgs/{uuid}/billing?{parameters}"))
 
-    def get_org_billing_by_vdc(self, uuid) -> Report:
+    def get_org_billing_by_vdc(self, uuid: str) -> Report:
         """Returns billing information by VDC
         
         No example use discovered in the iland console.
         """
         return Report(self.api.get(f"/orgs/{uuid}/billing-by-vdc"))
 
-    def get_org_billing_historical(self, uuid, start_struct, end_struct) -> Report:
+    def get_org_billing_historical(self, uuid: str, start: datetime.date, end: datetime.date) -> Report:
         """Returns a series of historical monthly org costs
 
         The console pulls the last 5 months to use in the montly bar graph on the billing tab:
         https://console.ilandcloud.com/api/v1/orgs/{uuid}/historical-billing?start=1624027630654&end=1637250430654
         """
-        start = int(time.mktime(start_struct)) * 1000
-        end = int(time.mktime(end_struct)) * 1000
-        parameters = f"start={start}&end={end}"
+        start_timestamp = int(time.mktime(start.timetuple())) * 1000
+        end_timestamp = int(time.mktime(end.timetuple())) * 1000
+        parameters = f"start={start_timestamp}&end={end_timestamp}"
         return Report(self.api.get(f"/orgs/{uuid}/historical-billing?{parameters}"))
 
 
-    def get_org_billing_historical_vdc(self, uuid, start, end) -> Report:
+    def get_org_billing_historical_vdc(self, uuid: str, start: datetime.date, end: datetime.date) -> Report:
         """Returns the historical billing data by VDC
         
         The console uses historical-billing-by-vdc to build the historical billing bar graphs.
         https://console.ilandcloud.com/api/v1/orgs/{uuid}/historical-billing-by-vdc?startMonth=7&startYear=2021&endMonth=11&endYear=2021
         """
-        parameters = f"startYear={start.tm_year}&startMonth={start.tm_mon}&endYear={end.tm_year}&endMonth={end.tm_mon}"
+        parameters = f"startYear={start.year}&startMonth={start.month}&endYear={end.year}&endMonth={end.month}"
         return Report(self.api.get(f"/orgs/{uuid}/historical-billing-by-vdc?{parameters}"))
 
-    def get_o365_billing(self, company, location) -> Report:
+    def get_o365_billing(self, company: str, location: str, start: datetime.date, end: datetime.date) -> Report:
         """Returns the O365 billing for a location
         
-        Get company from: Inventory['inventory'][0]['company_id']
-        Get o365_orgs from: Inventory['inventory'][0]['entities']['O365_ORGANIZATION']
-        Get locations from: o365_orgs[0]['uuid'].split(':')[0]
+        Get company from: ilandinfo inventory company
+        Get location from: ilandinfo inventory o365-org; Sub-string of UUID before the first ":"
 
         Console example:
         https://console.ilandcloud.com/api/v1/companies/{company}/location/lon02.ilandcloud.com/o365-billing?startYear=2021&startMonth=9&endYear=2021&endMonth=11
         """
-        return Report(self.api.get(f"/companies/{company}/location/{location}/o365-billing"))
+        parameters = f"startYear={start.year}&startMonth={start.month}&endYear={end.year}&endMonth={end.month}"
+        return Report(self.api.get(f"/companies/{company}/location/{location}/o365-billing?{parameters}"))
 
     # vdcs-cost-over-invoice-period ? year, month
     # Returns a time series (1 hour increments) of VDCs sum costs for the VDC Cost Accrual Breakdown graph
@@ -154,7 +157,8 @@ class Client:
 def get_args() -> argparse.Namespace:
     """ Setup the argument parser and parse the arguments.
 
-        ilandinfo inventory object
+        ilandinfo inventory <object>
+        ilandinfo billing <service>
         
         -c, --credential-file  default=creds.json
     """
@@ -198,10 +202,10 @@ def get_args() -> argparse.Namespace:
     billing_parser.add_argument(
         'service',
         choices=[
+            'o365',
             'org',
             'org-by-vdc',
             'org-summary',
-            'backup',
             'org-historical',
             'org-historical-by-vdc',
             'vapp',
@@ -211,47 +215,66 @@ def get_args() -> argparse.Namespace:
         ]
     )
     billing_parser.add_argument(
-        'uuid',
+        '--uuid',
         type=str,
         help='service UUID to report on'
     )
     billing_parser.add_argument(
         '--start',
         type=str,
-        help='start date in YYYY-MM format'
+        help='start date in YYYY-MM-DD format'
     )
     billing_parser.add_argument(
         '--end',
         type=str,
-        help='end date in YYYY-MM format'
+        help='end date in YYYY-MM-DD format'
     )
     billing_parser.add_argument(
         '--date',
         type=str,
-        help='date in YYYY-MM format'
+        help='date in YYYY-MM-DD format'
+    )
+    billing_parser.add_argument(
+        '--company',
+        type=str,
+        help='company number'
+    )
+    billing_parser.add_argument(
+        '--location',
+        type=str,
+        help='location in LLL##.ilandcloud.com format'
     )
 
     return parser.parse_args()
 
-def get_credentials(credentials_file) -> dict:
+def get_credentials(credentials_file: str) -> dict:
     """Open the JSON format credentials file and import the credentials."""
     with open(credentials_file, 'r') as file:
         credentials = json.load(file)
     return credentials
 
-def parse_time(time_string) -> time.struct_time:
-    """Take a string with the format YYYY-MM and return a time.struct_time"""
+def parse_date(date_string: str) -> datetime.date:
+    """Take a string with the format YYYY-MM-DD and return a datetime.date"""
     try:
-        time_struct = time.strptime(time_string, '%Y-%m')
+        time_struct = datetime.date.fromisoformat(date_string)
     except ValueError:
-        sys.exit('Incorrect date format. Correct format is YYYY-MM where YYYY is the four-digit year and MM is the 2 digit month.')
+        sys.exit('Incorrect date format. Correct format is YYYY-MM-DD.\n  \
+            YYYY is the four-digit year.\n  \
+            MM is the two-digit month.\n  \
+            DD is the two-digit day.')
 
     return time_struct
 
-def requires_start_end(args) -> None:
-    """Send an error if start and end dates are not provided on the command line."""
-    if not args.start or not args.end:
-        sys.exit(f'Missing parameters. {args.command} {args.service} requires --start and --end options.')
+def check_required_arguments(args: argparse.Namespace, *arguments) -> None:
+    """Send an error if required optional arguments are not provided."""
+    missing_arguments = []
+    print(vars(args))
+    for argument in arguments:
+        if not vars(args)[argument]:
+            missing_arguments.append(f"--{argument}")
+
+    if missing_arguments:
+        sys.exit(f'Missing arguments. {args.command} {args.service} requires: {" ,".join(missing_arguments)}')
 
 def main() -> None:
     args = get_args()
@@ -267,32 +290,40 @@ def main() -> None:
 
     if args.command == 'billing':
         if args.service == 'org':
+            check_required_arguments('uuid')
             if args.date:
-                date = parse_time(args.date)
+                date = parse_date(args.date)
             else:
-                date = time.localtime()
+                date = datetime.date.today()
             report = client.get_org_billing(args.uuid, date)
-            print(report)
         elif args.service == 'org-by-vdc':
+            check_required_arguments(args, 'uuid')
             report = client.get_org_billing_by_vdc(args.uuid)
-            print(report)
         elif args.service == 'org-summary':
+            check_required_arguments(args, 'uuid')
             report = client.get_org_billing_summary(args.uuid)
-            print(report)
         elif args.service == 'org-historical':
-            requires_start_end()
-            start = parse_time(args.start)
-            end = parse_time(args.end)
+            check_required_arguments(args, 'start', 'end')
+            start = parse_date(args.start)
+            end = parse_date(args.end)
             report = client.get_org_billing_historical(args.uuid, start, end)
-            print(report)
         elif args.service == 'org-historical-by-vdc':
-            requires_start_end()
-            start = parse_time(args.start)
-            end = parse_time(args.end)
+            check_required_arguments(args, 'start', 'end')
+            start = parse_date(args.start)
+            end = parse_date(args.end)
             report = client.get_org_billing_historical_vdc(args.uuid, start, end)
-            print(report)
         elif args.service== 'o365':
-            raise NotImplementedError
+            check_required_arguments(args, 'company', 'location')
+            if args.start and args.end:
+                start = parse_date(args.start)
+                end = parse_date(args.end)
+            else:
+                end = datetime.date.today()
+                start = end + relativedelta(months=-6)
+
+        report = client.get_o365_billing(args.company, args.location, start, end)
+
+        print(report)
 
 if __name__ == '__main__':
     main()
