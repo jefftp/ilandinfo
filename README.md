@@ -10,7 +10,6 @@ ilandinfo was built and tested with Python version 3.9.
 ilandinfo requires:
 
 * [iland-sdk](https://github.com/ilanddev/python-sdk)
-* [python-dateutil](https://pypi.org/project/python-dateutil/)
 
 Here's the recommended installation process to get up and working quickly:
 
@@ -25,8 +24,6 @@ Here's the recommended installation process to get up and working quickly:
 $ python3 -m venv iland
 
 $ source iland/bin/activate
-
-(iland) $ pip install iland-sdk python-dateutil
 
 (iland) $ ./ilandinfo.py inventory company
 Name, UUID

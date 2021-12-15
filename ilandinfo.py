@@ -17,8 +17,6 @@ import time
 import sys
 import datetime
 
-from dateutil.relativedelta import relativedelta
-
 class Inventory:
     def __init__(self, data: dict):
         self.company_id = data['company_id']
@@ -146,8 +144,19 @@ class Client:
         Console example:
         https://console.ilandcloud.com/api/v1/companies/{company}/location/lon02.ilandcloud.com/o365-billing?startYear=2021&startMonth=9&endYear=2021&endMonth=11
         """
-        parameters = f"startYear={start.year}&startMonth={start.month}&endYear={end.year}&endMonth={end.month}"
-        return Report(self.api.get(f"/companies/{company}/location/{location}/o365-billing?{parameters}"))
+        parameter_list = []
+        
+        if start:
+            parameter_list.append(f"startYear={start.year}&startMonth={start.month}")
+        if end:
+            parameter_list.append(f"endYear={end.year}&endMonth={end.month}")
+
+        parameters = "&".join(parameter_list)
+
+        if parameters:
+            return Report(self.api.get(f"/companies/{company}/location/{location}/o365-billing?{parameters}"))
+        else:
+            return Report(self.api.get(f"/companies/{company}/location/{location}/o365-billing"))
 
     def get_backup_tenants_billing(self, company: str, location: str, start: datetime.date, end: datetime.date) -> Report:
         """Returns the VCC Backup Tenants Billing report for a company
@@ -333,6 +342,7 @@ def main() -> None:
             start = parse_date(args.start)
             end = parse_date(args.end)
             report = client.get_org_billing_historical(args.uuid, start, end)
+
         elif args.service == 'org-historical-by-vdc':
             check_required_arguments(args, 'start', 'end')
             start = parse_date(args.start)
@@ -340,13 +350,13 @@ def main() -> None:
             report = client.get_org_billing_historical_vdc(args.uuid, start, end)
         elif args.service == 'o365':
             check_required_arguments(args, 'company', 'location')
+            start = None
+            end = None
 
-            if args.start and args.end:
+            if args.start:
                 start = parse_date(args.start)
+            if args.end:
                 end = parse_date(args.end)
-            else:
-                end = datetime.date.today()
-                start = end + relativedelta(months=-6)
 
             report = client.get_o365_billing(args.company, args.location, start, end)
         elif args.service == 'backup':
