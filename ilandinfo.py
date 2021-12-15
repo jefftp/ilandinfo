@@ -37,25 +37,25 @@ class Inventory:
         """Convert the object type used in the CLI to the API entity label."""
         items = []
         entity_lookup = {
-            'catalog'       : 'IAAS_CATALOG',
-            'company'       : 'COMPANY',
-            'edge'          : 'IAAS_EDGE',
-            'location'      : 'IAAS_LOCATION',
-            'media'         : 'IAAS_MEDIA',
-            'network'       : 'IAAS_INTERNAL_NETWORK',
-            'o365-job'      : 'O365_JOB',
-            'o365-location' : 'O365_LOCATION',
-            'o365-org'      : 'O365_ORGANIZATION',
-            'o365-restore'  : 'O365_RESTORE_SESSION',
-            'org'           : 'IAAS_ORGANIZATION',
-            'template'      : 'IAAS_VAPP_TEMPLATE',
-            'vdc'           : 'IAAS_VDC',
-            'vapp'          : 'IAAS_VAPP',
-            'vapp-network'  : 'IAAS_VAPP_NETWORK',
-            'vcc-location'  : 'VCC_BACKUP_LOCATION',
-            'vcc-tenant'    : 'VCC_BACKUP_TENANT',
-            'vpg'           : 'IAAS_VPG',
-            'vm'            : 'IAAS_VM'
+            'catalog'         : 'IAAS_CATALOG',
+            'company'         : 'COMPANY',
+            'edge'            : 'IAAS_EDGE',
+            'location'        : 'IAAS_LOCATION',
+            'media'           : 'IAAS_MEDIA',
+            'network'         : 'IAAS_INTERNAL_NETWORK',
+            'o365-job'        : 'O365_JOB',
+            'o365-location'   : 'O365_LOCATION',
+            'o365-org'        : 'O365_ORGANIZATION',
+            'o365-restore'    : 'O365_RESTORE_SESSION',
+            'org'             : 'IAAS_ORGANIZATION',
+            'template'        : 'IAAS_VAPP_TEMPLATE',
+            'vdc'             : 'IAAS_VDC',
+            'vapp'            : 'IAAS_VAPP',
+            'vapp-network'    : 'IAAS_VAPP_NETWORK',
+            'backup-location' : 'VCC_BACKUP_LOCATION',
+            'backup-tenant'   : 'VCC_BACKUP_TENANT',
+            'vpg'             : 'IAAS_VPG',
+            'vm'              : 'IAAS_VM'
         }
 
         api_entity = entity_lookup[object]
@@ -128,7 +128,6 @@ class Client:
         parameters = f"start={start_timestamp}&end={end_timestamp}"
         return Report(self.api.get(f"/orgs/{uuid}/historical-billing?{parameters}"))
 
-
     def get_org_billing_historical_vdc(self, uuid: str, start: datetime.date, end: datetime.date) -> Report:
         """Returns the historical billing data by VDC
         
@@ -149,6 +148,32 @@ class Client:
         """
         parameters = f"startYear={start.year}&startMonth={start.month}&endYear={end.year}&endMonth={end.month}"
         return Report(self.api.get(f"/companies/{company}/location/{location}/o365-billing?{parameters}"))
+
+    def get_backup_tenants_billing(self, company: str, location: str, start: datetime.date, end: datetime.date) -> Report:
+        """Returns the VCC Backup Tenants Billing report for a company
+        
+        company is required,
+        location, start, and end are optional.
+
+        Console example:
+        https://console.ilandcloud.com/api/v1/companies/{company}/vcc-backup-tenants-billing?location=dal02.ilandcloud.com&startYear=2021&startMonth=7&endYear=2021&endMonth=12
+        """
+        parameter_list = []
+
+        if location:
+            parameter_list.append(f"location={location}")
+        if start:
+            parameter_list.append(f"startYear={start.year}&startMonth={start.month}")
+        if end:
+            parameter_list.append(f"endYear={end.year}&endMonth={end.month}")
+
+        parameters = "&".join(parameter_list)
+
+        if parameters:
+            return Report(self.api.get(f"/companies/{company}/vcc-backup-tenants-billing?{parameters}"))
+        else:
+            return Report(self.api.get(f"/companies/{company}/vcc-backup-tenants-billing"))
+
 
     # vdcs-cost-over-invoice-period ? year, month
     # Returns a time series (1 hour increments) of VDCs sum costs for the VDC Cost Accrual Breakdown graph
@@ -183,7 +208,8 @@ def get_args() -> argparse.Namespace:
     inventory_parser.add_argument(
         'object',
         choices=[
-            'backup',
+            'backup-location',
+            'backup-tenant',
             'company',
             'location',
             'o365-org',
@@ -202,6 +228,7 @@ def get_args() -> argparse.Namespace:
     billing_parser.add_argument(
         'service',
         choices=[
+            'backup',
             'o365',
             'org',
             'org-by-vdc',
@@ -311,8 +338,9 @@ def main() -> None:
             start = parse_date(args.start)
             end = parse_date(args.end)
             report = client.get_org_billing_historical_vdc(args.uuid, start, end)
-        elif args.service== 'o365':
+        elif args.service == 'o365':
             check_required_arguments(args, 'company', 'location')
+
             if args.start and args.end:
                 start = parse_date(args.start)
                 end = parse_date(args.end)
@@ -320,7 +348,18 @@ def main() -> None:
                 end = datetime.date.today()
                 start = end + relativedelta(months=-6)
 
-        report = client.get_o365_billing(args.company, args.location, start, end)
+            report = client.get_o365_billing(args.company, args.location, start, end)
+        elif args.service == 'backup':
+            check_required_arguments(args, 'company')
+            start = None
+            end = None
+
+            if args.start:
+                start = parse_date(args.start)
+            if args.end:
+                end = parse_date(args.end)
+
+            report = client.get_backup_tenants_billing(args.company, args.location, start, end)
 
         print(report)
 
@@ -328,7 +367,6 @@ if __name__ == '__main__':
     main()
 
 # TODO for version 1.0.0
-# - Add billing for vcc backup
 # - Create a customized help to replace the default argparse output.
 # TODO for version 2.0.0
 # - Add an --output-format option.
