@@ -7,7 +7,7 @@
 # is located in the file LICENSE.
 #
 
-__version__ = '0.9.1'
+__version__ = '0.9.2'
 
 import iland
 import argparse
@@ -145,7 +145,7 @@ class Client:
         https://console.ilandcloud.com/api/v1/companies/{company}/location/lon02.ilandcloud.com/o365-billing?startYear=2021&startMonth=9&endYear=2021&endMonth=11
         """
         parameter_list = []
-        
+
         if start:
             parameter_list.append(f"startYear={start.year}&startMonth={start.month}")
         if end:
