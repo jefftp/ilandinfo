@@ -7,7 +7,7 @@
 # is located in the file LICENSE.
 #
 
-__version__ = '0.9.2'
+__version__ = '0.9.3'
 
 import iland
 import argparse
