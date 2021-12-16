@@ -86,10 +86,19 @@ class Client:
         self.username = credentials['username']
         self.api = iland.Api(**credentials)
 
-    def get_inventory(self) -> Inventory:
+    def get_inventory(self, company: str) -> Inventory:
         """Return the inventory object for the user specified in the credentials file."""
-        inventory = self.api.get(f"/users/{self.username}/inventory")
-        return Inventory(inventory['inventory'][0])
+        inventory = self.api.get(f"/users/{self.username}/inventory")['inventory']
+
+        if not company:
+            selected_inventory = inventory[0]
+        else:
+            selected_inventory = next((item for item in inventory if item['company_id'] == company), None)
+
+        if not selected_inventory:
+            sys.exit(f"Company {company} not found in user {self.username} inventory.")
+
+        return Inventory(selected_inventory)
 
     def get_org_billing_summary(self, uuid: str) -> Report:
         """Returns previous month, current month, previous hour, and current hour billing
@@ -230,6 +239,12 @@ def get_args() -> argparse.Namespace:
         default=None,
         help='Type of object to list'
     )
+    inventory_parser.add_argument(
+        '--company',
+        type=str,
+        help='company number'
+    )
+
     billing_parser = subparsers.add_parser(
         'billing',
         help='Display the billing report for the specified service'
@@ -320,7 +335,7 @@ def main() -> None:
     iland.log.LOG.setLevel(logging.WARNING)
 
     if args.command == 'inventory':
-        inventory = client.get_inventory()
+        inventory = client.get_inventory(args.company)
         inventory.csv_list_object(args.object)
 
     if args.command == 'billing':
@@ -377,6 +392,7 @@ if __name__ == '__main__':
     main()
 
 # TODO for version 1.0.0
+# - Catch exception iland.exception.ApiException gracefully in Client.
 # - Create a customized help to replace the default argparse output.
 # TODO for version 2.0.0
 # - Add an --output-format option.
